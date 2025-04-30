@@ -32,6 +32,10 @@ class ContentScraper:
             'wikisource.org': self._scrape_wikisource,
             'gutenberg.org': self._scrape_gutenberg,
         }
+        
+        # Maximum documents to collect per category
+        self.max_primary_sources = 5  # More primary sources
+        self.max_secondary_sources = 2  # Fewer secondary sources
 
     def _clean_url(self, url: str) -> Optional[str]:
         """Clean and validate a URL."""
@@ -66,7 +70,7 @@ class ContentScraper:
             logger.error(f"Error fetching {url}: {str(e)}")
             return None
 
-    def _search_duckduckgo(self, query: str) -> List[str]:
+    def _search_duckduckgo(self, query: str, max_results: int = 3) -> List[str]:
         """Search DuckDuckGo for relevant URLs."""
         search_url = f"https://html.duckduckgo.com/html/?q={quote_plus(query)}"
         response = self._make_request(search_url)
@@ -97,7 +101,7 @@ class ContentScraper:
                     if not any(excluded in domain for excluded in ['google.com', 'youtube.com', 'facebook.com', 'twitter.com']):
                         links.add(clean_url)
         
-        return list(links)[:5]  # Limit to first 5 unique results
+        return list(links)[:max_results]
 
     def _scrape_wikisource(self, soup: BeautifulSoup) -> Optional[str]:
         """Extract content from Wikisource pages."""
@@ -173,28 +177,36 @@ class ContentScraper:
         logger.info(f"Starting content scraping for: {name}")
         collected_content = []
         seen_urls = set()
-
-        # Search queries for different content types
-        search_queries = [
-            f"{name} speech transcript",
-            f"{name} writings",
-            f"{name} letters correspondence",
-            f"{name} interview transcript",
-            f"{name} essays",
-            f"site:wikisource.org {name}",
-            f"site:gutenberg.org {name}",
+        
+        # First priority: Primary sources
+        primary_queries = [
+            f"site:wikisource.org {name} writings",
+            f"site:gutenberg.org {name} works",
+            f"{name} original writings",
+            f"{name} letters correspondence primary source",
+        ]
+        
+        # Second priority: Secondary sources
+        secondary_queries = [
+            f"{name} philosophical writings analysis",
+            f"{name} historical biography",
         ]
 
-        for query in search_queries:
-            logger.info(f"Searching for: {query}")
-            urls = self._search_duckduckgo(query)
+        # Process primary sources first
+        primary_count = 0
+        for query in primary_queries:
+            if primary_count >= self.max_primary_sources:
+                break
+                
+            logger.info(f"Searching primary sources: {query}")
+            urls = self._search_duckduckgo(query, max_results=2)  # Limit results per query
             
             for url in urls:
-                if url in seen_urls:
+                if url in seen_urls or primary_count >= self.max_primary_sources:
                     continue
                     
                 seen_urls.add(url)
-                logger.info(f"Processing URL: {url}")
+                logger.info(f"Processing primary source URL: {url}")
 
                 response = self._make_request(url)
                 if not response:
@@ -218,40 +230,64 @@ class ContentScraper:
                                 'title': soup.title.string if soup.title else url,
                             }
                             collected_content.append(entry)
-                            logger.info(f"Successfully scraped content from known source: {url}")
+                            primary_count += 1
+                            logger.info(f"Successfully scraped primary source from: {url}")
                         break
 
-                # If not a known source or known source failed, try generic extraction
-                if not content:
+                # If not a known source, try generic extraction
+                if not content and 'primary' in query.lower():
                     content = self._extract_content(soup)
                     if content:
                         entry = {
                             'source_url': url,
                             'content': content,
-                            'content_type': self._determine_content_type(query),
+                            'content_type': 'primary_source',
                             'person': name,
                             'scraped_date': datetime.now().isoformat(),
                             'title': soup.title.string if soup.title else url,
                         }
                         collected_content.append(entry)
-                        logger.info(f"Successfully scraped content from: {url}")
+                        primary_count += 1
+                        logger.info(f"Successfully scraped primary source from: {url}")
 
+        # Process secondary sources if we need more content
+        secondary_count = 0
+        if len(collected_content) < (self.max_primary_sources + self.max_secondary_sources):
+            for query in secondary_queries:
+                if secondary_count >= self.max_secondary_sources:
+                    break
+                    
+                logger.info(f"Searching secondary sources: {query}")
+                urls = self._search_duckduckgo(query, max_results=1)  # Very limited secondary sources
+                
+                for url in urls:
+                    if url in seen_urls or secondary_count >= self.max_secondary_sources:
+                        continue
+                        
+                    seen_urls.add(url)
+                    logger.info(f"Processing secondary source URL: {url}")
+
+                    response = self._make_request(url)
+                    if not response:
+                        continue
+
+                    soup = BeautifulSoup(response.text, 'html.parser')
+                    content = self._extract_content(soup)
+                    if content:
+                        entry = {
+                            'source_url': url,
+                            'content': content,
+                            'content_type': 'secondary_source',
+                            'person': name,
+                            'scraped_date': datetime.now().isoformat(),
+                            'title': soup.title.string if soup.title else url,
+                        }
+                        collected_content.append(entry)
+                        secondary_count += 1
+                        logger.info(f"Successfully scraped secondary source from: {url}")
+
+        logger.info(f"Completed scraping. Found {primary_count} primary sources and {secondary_count} secondary sources.")
         return collected_content
-
-    def _determine_content_type(self, query: str) -> str:
-        """Determine content type based on search query."""
-        if 'speech' in query:
-            return 'speech'
-        elif 'writings' in query or 'essays' in query:
-            return 'writing'
-        elif 'letters' in query or 'correspondence' in query:
-            return 'correspondence'
-        elif 'interview' in query:
-            return 'interview'
-        elif 'wikisource' in query or 'gutenberg' in query:
-            return 'primary_source'
-        else:
-            return 'other'
 
 def scrape_person_content(name: str, output_dir: Optional[str] = None) -> List[Dict]:
     """

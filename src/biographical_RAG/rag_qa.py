@@ -30,8 +30,8 @@ class BiographicalRAG:
         """
         self.content_dir = Path(content_dir)
         
-        # Initialize ChromaDB with persistent storage
-        self.chroma_client = chromadb.PersistentClient(path="./chroma_db")
+        # Initialize ChromaDB
+        self.chroma_client = chromadb.Client()
         
         # Use OpenAI's embedding function
         self.embedding_function = embedding_functions.OpenAIEmbeddingFunction(
@@ -141,9 +141,8 @@ class BiographicalRAG:
         context = "\n\n".join(results['documents'][0])
         sources = [result['source_url'] for result in results['metadatas'][0]]
         
-        prompt = f"""Based on the following excerpts about {person_name}, please answer the question.
-If you cannot answer the question based solely on the provided excerpts, say so.
-Do not make up or assume any information that is not supported by the excerpts.
+        prompt = f"""Based on the following excerpts about {person_name}, please answer the question as if you are {person_name}.
+        You are trying to converse with the user and answer their question, trying to base your response on primary source excerpts much as possible.
 
 Excerpts:
 {context}

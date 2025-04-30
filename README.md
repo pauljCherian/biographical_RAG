@@ -78,11 +78,13 @@ biographical_RAG/
 │       ├── run.py           # CLI interface
 │       ├── scraper.py       # Content collection
 │       ├── rag_qa.py        # RAG implementation
-│       └── __init__.py
+│       ├── setup_nltk.py    # NLTK initialization
+│       └── __init__.py      # Package initialization
 ├── scraped_content/         # Stored biographical content
 ├── chroma_db/              # Vector store
 ├── pyproject.toml          # Project configuration
-└── README.md
+├── .env.example            # Environment variables template
+└── README.md              # Documentation
 ```
 
 ## Dependencies
@@ -90,6 +92,7 @@ biographical_RAG/
 - OpenAI API for embeddings and question answering
 - ChromaDB for vector storage
 - BeautifulSoup4 for web scraping
+- NLTK for text processing
 - Other dependencies listed in pyproject.toml
 
 ## Contributing
