@@ -247,8 +247,9 @@ pillow==11.2.1
     #   streamlit
 posthog==4.0.1
     # via chromadb
-protobuf==6.30.2
+protobuf==3.20.3
     # via
+    #   biographical-rag (pyproject.toml)
     #   googleapis-common-protos
     #   onnxruntime
     #   opentelemetry-proto
@@ -306,6 +307,7 @@ regex==2024.11.6
     #   transformers
 requests==2.32.3
     # via
+    #   biographical-rag (pyproject.toml)
     #   feedfinder2
     #   huggingface-hub
     #   kubernetes
