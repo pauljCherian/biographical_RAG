@@ -141,22 +141,20 @@ class BiographicalRAG:
         context = "\n\n".join(results['documents'][0])
         sources = [result['source_url'] for result in results['metadatas'][0]]
         
-        prompt = f"""Based on the following excerpts about {person_name}, please answer the question.
-If you cannot answer the question based solely on the provided excerpts, say so.
-Do not make up or assume any information that is not supported by the excerpts.
+        prompt = f"""Based on the following excerpts about {person_name}, please answer the question as if you are {person_name}, using first person and their perspective. If the excerpts do not provide a precise answer, you may take creative liberties to answer in the style, philosophy, and voice of {person_name}, as long as your response is plausible and consistent with the provided material. If you cannot answer the question at all, say so.
 
 Excerpts:
 {context}
 
 Question: {question}
 
-Answer:"""
+Answer (in the voice of {person_name}):"""
 
         # Get completion from OpenAI
         response = openai.chat.completions.create(
             model="gpt-4-turbo-preview",
             messages=[
-                {"role": "system", "content": "You are a helpful AI assistant that answers questions about historical figures based on provided source material. Always be truthful and admit when you don't have enough information to answer a question."},
+                {"role": "system", "content": f"You are {person_name}, answering questions in the first person based on the provided source material. If the sources do not provide a precise answer, you may take creative liberties to answer in the style, philosophy, and voice of {person_name}, as long as your response is plausible and consistent with the provided material. Always be truthful about what is and isn't known."},
                 {"role": "user", "content": prompt}
             ],
             temperature=0

@@ -97,7 +97,12 @@ class ContentScraper:
                     if not any(excluded in domain for excluded in ['google.com', 'youtube.com', 'facebook.com', 'twitter.com']):
                         links.add(clean_url)
         
-        return list(links)[:5]  # Limit to first 5 unique results
+        # Prioritize primary sources: allow more results for them
+        primary_sources = ["wikisource", "gutenberg"]
+        if any(ps in query.lower() for ps in primary_sources):
+            return list(links)[:10]  # Up to 10 for primary sources
+        else:
+            return list(links)[:4]  # Only 4 for others
 
     def _scrape_wikisource(self, soup: BeautifulSoup) -> Optional[str]:
         """Extract content from Wikisource pages."""
@@ -160,13 +165,12 @@ class ContentScraper:
 
         return None
 
-    def scrape_content(self, name: str) -> List[Dict]:
+    def scrape_content(self, name: str, max_articles: int = 10) -> List[Dict]:
         """
         Scrape content related to the given person from various sources.
-        
         Args:
             name (str): The name of the person to search for
-            
+            max_articles (int): Maximum number of articles to scrape
         Returns:
             List[Dict]: List of dictionaries containing scraped content with metadata
         """
@@ -188,11 +192,12 @@ class ContentScraper:
         for query in search_queries:
             logger.info(f"Searching for: {query}")
             urls = self._search_duckduckgo(query)
-            
             for url in urls:
                 if url in seen_urls:
                     continue
-                    
+                if len(collected_content) >= max_articles:
+                    logger.info(f"Reached max_articles limit ({max_articles}). Stopping scrape.")
+                    return collected_content
                 seen_urls.add(url)
                 logger.info(f"Processing URL: {url}")
 
@@ -202,7 +207,6 @@ class ContentScraper:
 
                 soup = BeautifulSoup(response.text, 'html.parser')
                 content = None
-                
                 # Check if it's a known source
                 domain = urlparse(url).netloc
                 for known_domain, scraper_func in self.reliable_sources.items():
@@ -220,7 +224,6 @@ class ContentScraper:
                             collected_content.append(entry)
                             logger.info(f"Successfully scraped content from known source: {url}")
                         break
-
                 # If not a known source or known source failed, try generic extraction
                 if not content:
                     content = self._extract_content(soup)
@@ -235,7 +238,9 @@ class ContentScraper:
                         }
                         collected_content.append(entry)
                         logger.info(f"Successfully scraped content from: {url}")
-
+                if len(collected_content) >= max_articles:
+                    logger.info(f"Reached max_articles limit ({max_articles}). Stopping scrape.")
+                    return collected_content
         return collected_content
 
     def _determine_content_type(self, query: str) -> str:
@@ -253,31 +258,26 @@ class ContentScraper:
         else:
             return 'other'
 
-def scrape_person_content(name: str, output_dir: Optional[str] = None) -> List[Dict]:
+def scrape_person_content(name: str, output_dir: Optional[str] = None, max_articles: int = 10) -> List[Dict]:
     """
     Main function to scrape content for a person and optionally save to file.
-    
     Args:
         name (str): Name of the person to scrape content for
         output_dir (Optional[str]): Directory to save scraped content
-        
+        max_articles (int): Maximum number of articles to scrape
     Returns:
         List[Dict]: List of scraped content items
     """
     scraper = ContentScraper()
-    content = scraper.scrape_content(name)
-    
+    content = scraper.scrape_content(name, max_articles=max_articles)
     if output_dir:
         output_dir = Path(output_dir)
         output_dir.mkdir(parents=True, exist_ok=True)
-        
         # Save to JSON file
         output_file = output_dir / f"{name.lower().replace(' ', '_')}_content.json"
         with open(output_file, 'w', encoding='utf-8') as f:
             json.dump(content, f, ensure_ascii=False, indent=2)
-        
         logger.info(f"Saved scraped content to: {output_file}")
-    
     return content
 
 if __name__ == "__main__":

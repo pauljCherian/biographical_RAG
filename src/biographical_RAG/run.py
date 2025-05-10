@@ -5,9 +5,14 @@ Provides a command-line interface to scrape content and ask questions.
 
 import argparse
 import logging
-from typing import Optional
+from typing import Optional, List, Dict
 from pathlib import Path
 import sys
+import os
+print("sys.path:", sys.path)
+print("Current working directory:", os.getcwd())
+print("Contents of sys.path[0]:", os.listdir(sys.path[0]))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 # Change from relative to absolute imports
 from biographical_RAG.scraper import scrape_person_content
@@ -20,10 +25,12 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+print("PYTHONPATH:", sys.path)
+
 def scrape_mode(person_name: str, output_dir: str = "scraped_content") -> None:
     """Scrape content for a person."""
     try:
-        content = scrape_person_content(person_name, output_dir)
+        content = scrape_person_content(person_name, output_dir, max_articles=10)
         logger.info(f"Successfully scraped {len(content)} pieces of content for {person_name}")
     except Exception as e:
         logger.error(f"Error scraping content for {person_name}: {str(e)}")
